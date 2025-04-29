@@ -342,17 +342,46 @@ apiRouter.get('/data', (req, res) => {
 app.use('/api', apiRouter);
 
 // Verify API key endpoint
-app.get('/verify', verifyApiKey, (req, res) => {
-  res.json({ 
-    valid: true,
-    message: 'API key is valid',
-    keyDetails: {
-      name: req.apiKeyData.name,
-      expiresAt: req.apiKeyData.expiresAt,
-      usageCount: req.apiKeyData.usageCount,
-      usageLimit: req.apiKeyData.usageLimit
+// Thay thế đoạn code cũ của endpoint verify
+app.get('/verify', async (req, res) => {
+  const apiKey = req.query.key;
+
+  if (!apiKey) {
+    return res.send('false');
+  }
+
+  try {
+    // Get API key data
+    const keyData = await db.get("SELECT * FROM apikeys WHERE key = ?", [apiKey]);
+
+    if (!keyData) {
+      return res.send('false');
     }
-  });
+
+    if (!keyData.isActive) {
+      return res.send('false');
+    }
+
+    if (keyData.expiresAt && new Date(keyData.expiresAt) < new Date()) {
+      return res.send('false');
+    }
+
+    // Check usage limit
+    if (keyData.usageLimit > 0 && keyData.usageCount >= keyData.usageLimit) {
+      return res.send('false');
+    }
+
+    // Update usage statistics for the API key
+    await db.run(
+      'UPDATE apikeys SET usageCount = usageCount + 1, lastUsed = datetime("now") WHERE id = ?',
+      [keyData.id]
+    );
+
+    return res.send('true');
+  } catch (error) {
+    console.error('API key verification error:', error);
+    return res.send('false');
+  }
 });
 
 // Serve the main HTML file for any unhandled routes
