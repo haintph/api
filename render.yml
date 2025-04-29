@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: api-key-manager
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_TOKEN
+        sync: false
+    disk:
+      name: api-data
+      mountPath: /opt/render/project/src/database
+      sizeGB: 1
